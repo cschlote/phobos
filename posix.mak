@@ -281,7 +281,7 @@ ALL_D_FILES = $(addsuffix .d, $(STD_MODULES) $(EXTRA_MODULES_COMMON) \
 # C files to be part of the build
 C_MODULES = $(addprefix etc/c/zlib/, adler32 compress crc32 deflate	\
 	gzclose gzlib gzread gzwrite infback inffast inflate inftrees trees uncompr zutil)
-C_MODULES += $(addprefix etc/c/xxhash/, xxhash)
+C_MODULES += $(addprefix etc/c/xxhash/, xxhash xxh_x86dispatch)
 
 OBJS = $(addsuffix $(DOTOBJ),$(addprefix $(ROOT)/,$(C_MODULES)))
 
