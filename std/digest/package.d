@@ -89,7 +89,7 @@ import std.traits;
 @system unittest
 {
     //Generating the hashes of a file, idiomatic D way
-    import std.digest.crc, std.digest.md, std.digest.sha;
+    import std.digest.crc, std.digest.md, std.digest.xxh, std.digest.sha;
     import std.stdio;
 
     // Digests a file and prints the result.
@@ -106,6 +106,9 @@ import std.traits;
         foreach (name; args[1 .. $])
         {
             digestFile!MD5(name);
+            digestFile!Xxh32(name);
+            digestFile!Xxh64(name);
+            digestFile!Xxh128(name);
             digestFile!SHA1(name);
             digestFile!CRC32(name);
         }
@@ -115,7 +118,7 @@ import std.traits;
 @system unittest
 {
     //Generating the hashes of a file using the template API
-    import std.digest.crc, std.digest.md, std.digest.sha;
+    import std.digest.crc, std.digest.md, std.digest.xxh, std.digest.sha;
     import std.stdio;
     // Digests a file and prints the result.
     void digestFile(Hash)(ref Hash hash, string filename)
@@ -135,6 +138,7 @@ import std.traits;
     void uMain(string[] args)
     {
         MD5 md5;
+        Xxh64 xxh64;
         SHA1 sha1;
         CRC32 crc32;
 
@@ -145,6 +149,7 @@ import std.traits;
         foreach (arg; args[1 .. $])
         {
             digestFile(md5, arg);
+            digestFile(xxh64, arg);
             digestFile(sha1, arg);
             digestFile(crc32, arg);
         }
@@ -154,7 +159,7 @@ import std.traits;
 ///
 @system unittest
 {
-    import std.digest.crc, std.digest.md, std.digest.sha;
+    import std.digest.crc, std.digest.md, std.digest.xxh, std.digest.sha;
     import std.stdio;
 
     // Digests a file and prints the result.
@@ -174,12 +179,14 @@ import std.traits;
     void umain(string[] args)
     {
         auto md5 = new MD5Digest();
+        auto xxh64 = new XXH64Digest();
         auto sha1 = new SHA1Digest();
         auto crc32 = new CRC32Digest();
 
         foreach (arg; args[1 .. $])
         {
           digestFile(md5, arg);
+          digestFile(xxh64, arg);
           digestFile(sha1, arg);
           digestFile(crc32, arg);
         }
@@ -373,8 +380,11 @@ template hasPeek(T)
 ///
 @system unittest
 {
-    import std.digest.crc, std.digest.md;
+    import std.digest.crc, std.digest.md, std.digest.xxh;
     assert(!hasPeek!(MD5));
+    assert(!hasPeek!(Xxh32));
+    assert(!hasPeek!(Xxh64));
+    assert(!hasPeek!(Xxh128));
     assert(hasPeek!CRC32);
 }
 ///
@@ -519,8 +529,11 @@ if (allSatisfy!(isArray, typeof(data)))
 ///
 @system unittest
 {
-    import std.digest.crc, std.digest.md, std.digest.sha;
+    import std.digest.crc, std.digest.md, std.digest.xxh, std.digest.sha;
     auto md5   = digest!MD5(  "The quick brown fox jumps over the lazy dog");
+    auto xxh32 = digest!Xxh32(  "The quick brown fox jumps over the lazy dog");
+    auto xxh64 = digest!Xxh64(  "The quick brown fox jumps over the lazy dog");
+    auto xxh128 = digest!Xxh128(  "The quick brown fox jumps over the lazy dog");
     auto sha1  = digest!SHA1( "The quick brown fox jumps over the lazy dog");
     auto crc32 = digest!CRC32("The quick brown fox jumps over the lazy dog");
     assert(toHexString(crc32) == "39A34F41");
@@ -692,8 +705,11 @@ interface Digest
 ///
 @system unittest
 {
-    import std.digest.crc, std.digest.md, std.digest.sha;
+    import std.digest.crc, std.digest.md, std.digest.xxh, std.digest.sha;
     ubyte[] md5   = (new MD5Digest()).digest("The quick brown fox jumps over the lazy dog");
+    ubyte[] xxh32 = (new XXH32Digest()).digest("The quick brown fox jumps over the lazy dog");
+    ubyte[] xxh64 = (new XXH64Digest()).digest("The quick brown fox jumps over the lazy dog");
+    ubyte[] xxh128 = (new XXH128Digest()).digest("The quick brown fox jumps over the lazy dog");
     ubyte[] sha1  = (new SHA1Digest()).digest("The quick brown fox jumps over the lazy dog");
     ubyte[] crc32 = (new CRC32Digest()).digest("The quick brown fox jumps over the lazy dog");
     assert(crcHexString(crc32) == "414FA339");
@@ -897,8 +913,12 @@ if (isDigest!T)
 unittest
 {
     import std.digest.md : MD5;
+    import std.digest.xxh : Xxh32, Xxh64, Xxh128;
     import std.digest.sha : SHA1, SHA256, SHA512;
     assert(digestLength!MD5 == 16);
+    assert(digestLength!Xxh32 == 4);
+    assert(digestLength!Xxh64 == 8);
+    assert(digestLength!Xxh128 == 16);
     assert(digestLength!SHA1 == 20);
     assert(digestLength!SHA256 == 32);
     assert(digestLength!SHA512 == 64);
