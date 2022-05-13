@@ -35,7 +35,7 @@ $(TR $(TDNW Helpers) $(TD $(MYREF xxh32Of))
  * provided at $(I git@github.com:Cyan4973/xxHash.git).
  *
  * References:
- *      $(LINK2https://github.com/Cyan4973/xxHash, GitHub website of project)
+ *      $(LINK2 https://github.com/Cyan4973/xxHash, GitHub website of project)
  *
  * Source: $(PHOBOSSRC std/digest/xxh.d)
  *
