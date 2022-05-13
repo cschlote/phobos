@@ -115,7 +115,7 @@ enum XXH_errorcode {
 
 uint XXH_expectedVersionNumber ()  @trusted pure nothrow @nogc { return XXH_VERSION_NUMBER; }
 
-@safe unittest
+@system unittest
 {
     import std.format : format;
     assert(XXH_expectedVersionNumber() == XXH_versionNumber(),
