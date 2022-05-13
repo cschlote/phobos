@@ -1,0 +1,56 @@
+Add XXHash digests to phobos library
+
+This patch is motivated by the need to have a much faster alternative to the slow MD5 or SHAx cryptographic digests.
+XXHash by itself is no cryptographic hash, but good enough to create suitable checksums and is used e.g. with ZSTD compression.
+
+The patch adds the four digest variants of the XXHash project (see github.com:Cyan4973/xxHash.git) ranging
+from 32 to 128 bits bits digests. Both variants for the 64 bit digest (XXH and XXH3) are implemented.
+
+A similiar approach is used as for the ZIP code in phobos. The original upstream C sources are compiled and
+wrapped into some D code. This will make it much easier to integrate future updates from upstream. On the other hand,
+there is some hand-optimized assembly code for _x86_64 architecture.
+
+The results were compared against the outputs of the xxhsum commandline utility manually and match the outputs
+of the command line utility.
+
+There are unittests for all variants of XXHash (taken from MD5 sources and digest values were updated accordingly).
+
+The digests can be used with the template API:
+
+-------
+    XXH_32 hash0;
+    hash0.start();
+    hash0.put(cast(ubyte) 0);
+    auto result = hash0.finish();
+
+    XXH_64 hash1;
+    hash1.start();
+    hash1.put(cast(ubyte) 0);
+    auto result = hash1.finish();
+
+    XXH3_64 hash2;
+    hash2.start();
+    hash2.put(cast(ubyte) 0);
+    auto result = hash2.finish();
+
+    XXH3_128 hash3;
+    hash3.start();
+    hash3.put(cast(ubyte) 0);
+    auto result = hash3.finish();
+-------
+
+as well as with the OOP versions:
+
+-------
+    auto xxh0 = new XXH32Digest();
+    ubyte[] hash0 = xxh0.digest("abc");
+
+    auto xxh1 = new XXH64Digest();
+    ubyte[] hash1 = xxh1.digest("abc");
+
+    auto xxh1 = new XXH3_64Digest();
+    ubyte[] hash2 = xxh2.digest("abc");
+
+    auto xxh2 = new XXH128Digest();
+    ubyte[] hash3 = xxh3.digest("abc");
+-------
