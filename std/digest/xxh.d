@@ -115,7 +115,7 @@ enum XXH_errorcode {
 
 uint XXH_expectedVersionNumber ()  @trusted pure nothrow @nogc { return XXH_VERSION_NUMBER; }
 
-@system unittest
+@safe unittest
 {
     import std.format : format;
     assert(XXH_expectedVersionNumber() == XXH_versionNumber(),
@@ -126,7 +126,7 @@ uint XXH_expectedVersionNumber ()  @trusted pure nothrow @nogc { return XXH_VERS
 }
 
 extern (C) {
-    uint XXH_versionNumber ();
+    uint XXH_versionNumber () @trusted pure nothrow @nogc;
 
     XXH32_hash_t XXH32 (const void* input, size_t length, XXH32_hash_t seed) @trusted pure nothrow @nogc;
     XXH32_state_t* XXH32_createState() @trusted pure nothrow @nogc;
