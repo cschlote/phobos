@@ -354,10 +354,11 @@ struct XXHTemplate(HASH, STATE, bool useXXH3)
     auto result = hash1.finish();
 }
 
-alias XXH_32 = XXHTemplate!(XXH32_hash_t, XXH32_state_t, false);
-alias XXH_64 = XXHTemplate!(XXH64_hash_t, XXH64_state_t, false);
-alias XXH3_64 = XXHTemplate!(XXH64_hash_t, XXH3_state_t, true);
-alias XXH3_128 = XXHTemplate!(XXH128_hash_t, XXH3_state_t, true);
+alias XXH_32 = XXHTemplate!(XXH32_hash_t, XXH32_state_t, false); /// XXH_32 for XXH, 32bit, hash is ubyte[4]
+alias XXH_64 = XXHTemplate!(XXH64_hash_t, XXH64_state_t, false); /// XXH_64 for XXH, 64bit, hash is ubyte[8]
+alias XXH3_64 = XXHTemplate!(XXH64_hash_t, XXH3_state_t, true); /// XXH3_64 for XXH3, 64bits, hash is ubyte[8]
+alias XXH3_128 = XXHTemplate!(XXH128_hash_t, XXH3_state_t, true); /// XXH3_128 for XXH3, 128bits, hash is ubyte[16]
+
 ///
 @safe unittest
 {
@@ -703,13 +704,13 @@ auto xxh128Of(T...)(T data)
  * OOP API XXH implementation.
  * See `std.digest` for differences between template and OOP API.
  *
- * This is an alias for $(D $(REF WrapperDigest, std,digest)!XXH), see
+ * This is an alias for $(D $(REF WrapperDigest, std,digest)!XXH_32), see
  * there for more information.
  */
 alias XXH32Digest = WrapperDigest!XXH_32;
-alias XXH64Digest = WrapperDigest!XXH_64;
-alias XXH3_64Digest = WrapperDigest!XXH3_64;
-alias XXH128Digest = WrapperDigest!XXH3_128;
+alias XXH64Digest = WrapperDigest!XXH_64; ///ditto
+alias XXH3_64Digest = WrapperDigest!XXH3_64; ///ditto
+alias XXH128Digest = WrapperDigest!XXH3_128; ///ditto
 
 ///
 @safe unittest
