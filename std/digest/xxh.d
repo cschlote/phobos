@@ -237,7 +237,7 @@ struct XXHTemplate(HASH, STATE, bool useXXH3)
                 ec = XXH3_64bits_update(state, data.ptr, data.length);
             else static if (digestSize == 128)
                 ec = XXH3_128bits_update(state, data.ptr, data.length);
-            else 
+            else
                 assert (false, "Unknown XXH bitdeep or variant");
             assert (ec == XXH_errorcode.XXH_OK, "Update failed");
         }
@@ -269,7 +269,7 @@ struct XXHTemplate(HASH, STATE, bool useXXH3)
                 if (state == null) state = XXH3_createState();
                 ec = XXH3_128bits_reset(state);
             }
-            else 
+            else
                 assert (false, "Unknown XXH bitdeep or variant");
             //assert (ec == XXH_errorcode.XXH_OK, "reset failed");
         }
@@ -303,7 +303,7 @@ struct XXHTemplate(HASH, STATE, bool useXXH3)
             }
             assert (ec == XXH_errorcode.XXH_OK, "freestate failed");
             state = null;
-            
+
             return (cast(ubyte*) &rc)[0 .. rc.sizeof];
         }
 }
@@ -379,7 +379,7 @@ alias XXH3_128 = XXHTemplate!(XXH128_hash_t, XXH3_state_t, true);
     auto hash = xxh128Of("abc");
     //Let's get a hash string
     assert(toHexString(hash) == "06B05AB6733A618578AF5F94892F3950");
-                                 
+
 }
 
 ///
@@ -392,6 +392,39 @@ alias XXH3_128 = XXHTemplate!(XXH128_hash_t, XXH3_state_t, true);
     //Initialize data here...
     hash.put(data);
     ubyte[4] result = hash.finish();
+}
+///
+@safe unittest
+{
+    //Using the basic API
+    XXH_64 hash;
+    hash.start();
+    ubyte[1024] data;
+    //Initialize data here...
+    hash.put(data);
+    ubyte[8] result = hash.finish();
+}
+///
+@safe unittest
+{
+    //Using the basic API
+    XXH3_64 hash;
+    hash.start();
+    ubyte[1024] data;
+    //Initialize data here...
+    hash.put(data);
+    ubyte[8] result = hash.finish();
+}
+///
+@safe unittest
+{
+    //Using the basic API
+    XXH3_128 hash;
+    hash.start();
+    ubyte[1024] data;
+    //Initialize data here...
+    hash.put(data);
+    ubyte[16] result = hash.finish();
 }
 
 ///
@@ -409,12 +442,58 @@ alias XXH3_128 = XXHTemplate!(XXH128_hash_t, XXH3_state_t, true);
     auto hash = xxh.finish;
     assert(toHexString(hash) == "CF65B03E", "Got " ~ toHexString(hash));
 }
+///
+@safe unittest
+{
+    //Let's use the template features:
+    void doSomething(T)(ref T hash)
+    if (isDigest!T)
+    {
+        hash.put(cast(ubyte) 0);
+    }
+    XXH_64 xxh;
+    xxh.start();
+    doSomething(xxh);
+    auto hash = xxh.finish;
+    assert(toHexString(hash) == "E934A84ADB052768", "Got " ~ toHexString(hash));
+}
+///
+@safe unittest
+{
+    //Let's use the template features:
+    void doSomething(T)(ref T hash)
+    if (isDigest!T)
+    {
+        hash.put(cast(ubyte) 0);
+    }
+    XXH3_64 xxh;
+    xxh.start();
+    doSomething(xxh);
+    auto hash = xxh.finish;
+    assert(toHexString(hash) == "C44BDFF4074EECDB", "Got " ~ toHexString(hash));
+}
+///
+@safe unittest
+{
+    //Let's use the template features:
+    void doSomething(T)(ref T hash)
+    if (isDigest!T)
+    {
+        hash.put(cast(ubyte) 0);
+    }
+    XXH3_128 xxh;
+    xxh.start();
+    doSomething(xxh);
+    auto hash = xxh.finish;
+    assert(toHexString(hash) == "A6CD5E9392000F6AC44BDFF4074EECDB", "Got " ~ toHexString(hash));
+}
 
 ///
 @safe unittest
 {
     assert(isDigest!XXH_32);
     assert(isDigest!XXH_64);
+    assert(isDigest!XXH3_64);
     assert(isDigest!XXH3_128);
 }
 
@@ -423,7 +502,9 @@ alias XXH3_128 = XXHTemplate!(XXH128_hash_t, XXH3_state_t, true);
     import std.range;
     import std.conv : hexString;
 
-    ubyte[4] digest;
+    ubyte[4] digest32;
+    ubyte[8] digest64;
+    ubyte[16] digest128;
 
     XXH_32 xxh;
     xxh.put(cast(ubyte[])"abcdef");
@@ -431,30 +512,81 @@ alias XXH3_128 = XXHTemplate!(XXH128_hash_t, XXH3_state_t, true);
     xxh.put(cast(ubyte[])"");
     assert(xxh.finish() == cast(ubyte[]) hexString!"02cc5d05");
 
-    digest = xxh32Of("");
-    assert(digest == cast(ubyte[]) hexString!"02cc5d05");
+    digest32 = xxh32Of("");
+    assert(digest32 == cast(ubyte[]) hexString!"02cc5d05");
+    digest64 = xxh64Of("");
+    assert(digest64 == cast(ubyte[]) hexString!"EF46DB3751D8E999", "Got " ~ toHexString(digest64));
+    digest64 = xxh3_64Of("");
+    assert(digest64 == cast(ubyte[]) hexString!"2D06800538D394C2", "Got " ~ toHexString(digest64));
+    digest128 = xxh128Of("");
+    assert(digest128 == cast(ubyte[]) hexString!"99AA06D3014798D86001C324468D497F", "Got " ~ toHexString(digest128));
 
-    digest = xxh32Of("a");
-    assert(digest == cast(ubyte[]) hexString!"550d7456");
+    digest32 = xxh32Of("a");
+    assert(digest32 == cast(ubyte[]) hexString!"550d7456");
+    digest64 = xxh64Of("a");
+    assert(digest64 == cast(ubyte[]) hexString!"D24EC4F1A98C6E5B", "Got " ~ toHexString(digest64));
+    digest64 = xxh3_64Of("a");
+    assert(digest64 == cast(ubyte[]) hexString!"E6C632B61E964E1F", "Got " ~ toHexString(digest64));
+    digest128 = xxh128Of("a");
+    assert(digest128 == cast(ubyte[]) hexString!"A96FAF705AF16834E6C632B61E964E1F", "Got " ~ toHexString(digest128));
 
-    digest = xxh32Of("abc");
-    assert(digest == cast(ubyte[]) hexString!"32D153FF");
+    digest32 = xxh32Of("abc");
+    assert(digest32 == cast(ubyte[]) hexString!"32D153FF");
+    digest64 = xxh64Of("abc");
+    assert(digest64 == cast(ubyte[]) hexString!"44BC2CF5AD770999");
+    digest64 = xxh3_64Of("abc");
+    assert(digest64 == cast(ubyte[]) hexString!"78AF5F94892F3950");
+    digest128 = xxh128Of("abc");
+    assert(digest128 == cast(ubyte[]) hexString!"06B05AB6733A618578AF5F94892F3950");
 
-    digest = xxh32Of("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq");
-    assert(digest == cast(ubyte[]) hexString!"89ea60c3");
+    digest32 = xxh32Of("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq");
+    assert(digest32 == cast(ubyte[]) hexString!"89ea60c3");
+    digest64 = xxh64Of("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq");
+    assert(digest64 == cast(ubyte[]) hexString!"F06103773E8585DF", "Got " ~ toHexString(digest64));
+    digest64 = xxh3_64Of("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq");
+    assert(digest64 == cast(ubyte[]) hexString!"5BBCBBABCDCC3D3F", "Got " ~ toHexString(digest64));
+    digest128 = xxh128Of("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq");
+    assert(digest128 == cast(ubyte[]) hexString!"3D62D22A5169B016C0D894FD4828A1A7", "Got " ~ toHexString(digest128));
 
-    digest = xxh32Of("message digest");
-    assert(digest == cast(ubyte[]) hexString!"7c948494");
+    digest32 = xxh32Of("message digest");
+    assert(digest32 == cast(ubyte[]) hexString!"7c948494");
+    digest64 = xxh64Of("message digest");
+    assert(digest64 == cast(ubyte[]) hexString!"066ED728FCEEB3BE", "Got " ~ toHexString(digest64));
+    digest64 = xxh3_64Of("message digest");
+    assert(digest64 == cast(ubyte[]) hexString!"160D8E9329BE94F9", "Got " ~ toHexString(digest64));
+    digest128 = xxh128Of("message digest");
+    assert(digest128 == cast(ubyte[]) hexString!"34AB715D95E3B6490ABFABECB8E3A424", "Got " ~ toHexString(digest128));
 
-    digest = xxh32Of("abcdefghijklmnopqrstuvwxyz");
-    assert(digest == cast(ubyte[]) hexString!"63a14d5f");
+    digest32 = xxh32Of("abcdefghijklmnopqrstuvwxyz");
+    assert(digest32 == cast(ubyte[]) hexString!"63a14d5f");
+    digest64 = xxh64Of("abcdefghijklmnopqrstuvwxyz");
+    assert(digest64 == cast(ubyte[]) hexString!"CFE1F278FA89835C", "Got " ~ toHexString(digest64));
+    digest64 = xxh3_64Of("abcdefghijklmnopqrstuvwxyz");
+    assert(digest64 == cast(ubyte[]) hexString!"810F9CA067FBB90C", "Got " ~ toHexString(digest64));
+    digest128 = xxh128Of("abcdefghijklmnopqrstuvwxyz");
+    assert(digest128 == cast(ubyte[]) hexString!"DB7CA44E84843D67EBE162220154E1E6", "Got " ~ toHexString(digest128));
 
-    digest = xxh32Of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789");
-    assert(digest == cast(ubyte[]) hexString!"9c285e64");
+    digest32 = xxh32Of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789");
+    assert(digest32 == cast(ubyte[]) hexString!"9c285e64");
+    digest64 = xxh64Of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789");
+    assert(digest64 == cast(ubyte[]) hexString!"AAA46907D3047814", "Got " ~ toHexString(digest64));
+    digest64 = xxh3_64Of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789");
+    assert(digest64 == cast(ubyte[]) hexString!"643542BB51639CB2", "Got " ~ toHexString(digest64));
+    digest128 = xxh128Of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789");
+    assert(digest128 == cast(ubyte[]) hexString!"5BCB80B619500686A3C0560BD47A4FFB", "Got " ~ toHexString(digest128));
 
-    digest = xxh32Of("1234567890123456789012345678901234567890"~
+    digest32 = xxh32Of("1234567890123456789012345678901234567890"~
                     "1234567890123456789012345678901234567890");
-    assert(digest == cast(ubyte[]) hexString!"9c05f475");
+    assert(digest32 == cast(ubyte[]) hexString!"9c05f475");
+    digest64 = xxh64Of("1234567890123456789012345678901234567890"~
+                    "1234567890123456789012345678901234567890");
+    assert(digest64 == cast(ubyte[]) hexString!"E04A477F19EE145D", "Got " ~ toHexString(digest64));
+    digest64 = xxh3_64Of("1234567890123456789012345678901234567890"~
+                    "1234567890123456789012345678901234567890");
+    assert(digest64 == cast(ubyte[]) hexString!"7F58AA2520C681F9", "Got " ~ toHexString(digest64));
+    digest128 = xxh128Of("1234567890123456789012345678901234567890"~
+                    "1234567890123456789012345678901234567890");
+    assert(digest128 == cast(ubyte[]) hexString!"08DD22C3DDC34CE640CB8D6AC672DCB8", "Got " ~ toHexString(digest128));
 
     enum ubyte[16] input = cast(ubyte[16]) hexString!"c3fcd3d76192e4007dfb496cca67e13b";
     assert(toHexString(input)
@@ -462,12 +594,24 @@ alias XXH3_128 = XXHTemplate!(XXH128_hash_t, XXH3_state_t, true);
 
     ubyte[] onemilliona = new ubyte[1000000];
     onemilliona[] = 'a';
-    digest = xxh32Of(onemilliona);
-    assert(digest == cast(ubyte[]) hexString!"E1155920", "Got " ~ toHexString(digest));
+    digest32 = xxh32Of(onemilliona);
+    assert(digest32 == cast(ubyte[]) hexString!"E1155920", "Got " ~ toHexString(digest32));
+    digest64 = xxh64Of(onemilliona);
+    assert(digest64 == cast(ubyte[]) hexString!"DC483AAA9B4FDC40", "Got " ~ toHexString(digest64));
+    digest64 = xxh3_64Of(onemilliona);
+    assert(digest64 == cast(ubyte[]) hexString!"B1FD6FAE5285C4EB", "Got " ~ toHexString(digest64));
+    digest128 = xxh128Of(onemilliona);
+    assert(digest128 == cast(ubyte[]) hexString!"A545DF8E384A9579B1FD6FAE5285C4EB", "Got " ~ toHexString(digest128));
 
     auto oneMillionRange = repeat!ubyte(cast(ubyte)'a', 1000000);
-    digest = xxh32Of(oneMillionRange);
-    assert(digest == cast(ubyte[]) hexString!"E1155920", "Got " ~ toHexString(digest));
+    digest32 = xxh32Of(oneMillionRange);
+    assert(digest32 == cast(ubyte[]) hexString!"E1155920", "Got " ~ toHexString(digest32));
+    digest64 = xxh64Of(oneMillionRange);
+    assert(digest64 == cast(ubyte[]) hexString!"DC483AAA9B4FDC40", "Got " ~ toHexString(digest64));
+    digest64 = xxh3_64Of(oneMillionRange);
+    assert(digest64 == cast(ubyte[]) hexString!"B1FD6FAE5285C4EB", "Got " ~ toHexString(digest64));
+    digest128 = xxh128Of(oneMillionRange);
+    assert(digest128 == cast(ubyte[]) hexString!"A545DF8E384A9579B1FD6FAE5285C4EB", "Got " ~ toHexString(digest128));
 }
 
 /**
@@ -500,6 +644,12 @@ auto xxh128Of(T...)(T data)
 {
     auto hash = xxh32Of("abc");
     assert(hash == digest!XXH_32("abc"));
+    auto hash1 = xxh64Of("abc");
+    assert(hash1 == digest!XXH_64("abc"));
+    auto hash2 = xxh3_64Of("abc");
+    assert(hash2 == digest!XXH3_64("abc"));
+    auto hash3 = xxh128Of("abc");
+    assert(hash3 == digest!XXH3_128("abc"));
 }
 
 /**
@@ -511,6 +661,7 @@ auto xxh128Of(T...)(T data)
  */
 alias XXH32Digest = WrapperDigest!XXH_32;
 alias XXH64Digest = WrapperDigest!XXH_64;
+alias XXH3_64Digest = WrapperDigest!XXH3_64;
 alias XXH128Digest = WrapperDigest!XXH3_128;
 
 ///
@@ -521,6 +672,33 @@ alias XXH128Digest = WrapperDigest!XXH3_128;
     ubyte[] hash = xxh.digest("abc");
     //Let's get a hash string
     assert(toHexString(hash) == "32D153FF");
+}
+///
+@safe unittest
+{
+    //Simple example, hashing a string using Digest.digest helper function
+    auto xxh = new XXH64Digest();
+    ubyte[] hash = xxh.digest("abc");
+    //Let's get a hash string
+    assert(toHexString(hash) == "44BC2CF5AD770999");
+}
+///
+@safe unittest
+{
+    //Simple example, hashing a string using Digest.digest helper function
+    auto xxh = new XXH3_64Digest();
+    ubyte[] hash = xxh.digest("abc");
+    //Let's get a hash string
+    assert(toHexString(hash) == "78AF5F94892F3950");
+}
+///
+@safe unittest
+{
+    //Simple example, hashing a string using Digest.digest helper function
+    auto xxh = new XXH128Digest();
+    ubyte[] hash = xxh.digest("abc");
+    //Let's get a hash string
+    assert(toHexString(hash) == "06B05AB6733A618578AF5F94892F3950");
 }
 
 ///
@@ -539,11 +717,62 @@ alias XXH128Digest = WrapperDigest!XXH3_128;
     ubyte[] result = xxh.finish(buf[]);
     assert(toHexString(result) == "CF65B03E", "Got " ~ toHexString(result));
 }
+///
+@system unittest
+{
+     //Let's use the OOP features:
+    void test(Digest dig)
+    {
+      dig.put(cast(ubyte) 0);
+    }
+    auto xxh = new XXH64Digest();
+    test(xxh);
+
+    //Let's use a custom buffer:
+    ubyte[16] buf;
+    ubyte[] result = xxh.finish(buf[]);
+    assert(toHexString(result) == "E934A84ADB052768", "Got " ~ toHexString(result));
+}
+///
+@system unittest
+{
+     //Let's use the OOP features:
+    void test(Digest dig)
+    {
+      dig.put(cast(ubyte) 0);
+    }
+    auto xxh = new XXH3_64Digest();
+    test(xxh);
+
+    //Let's use a custom buffer:
+    ubyte[16] buf;
+    ubyte[] result = xxh.finish(buf[]);
+    assert(toHexString(result) == "C44BDFF4074EECDB", "Got " ~ toHexString(result));
+}
+///
+@system unittest
+{
+     //Let's use the OOP features:
+    void test(Digest dig)
+    {
+      dig.put(cast(ubyte) 0);
+    }
+    auto xxh = new XXH128Digest();
+    test(xxh);
+
+    //Let's use a custom buffer:
+    ubyte[16] buf;
+    ubyte[] result = xxh.finish(buf[]);
+    assert(toHexString(result) == "A6CD5E9392000F6AC44BDFF4074EECDB", "Got " ~ toHexString(result));
+}
 
 @system unittest
 {
     import std.conv : hexString;
     auto xxh = new XXH32Digest();
+    auto xxh64 = new XXH64Digest();
+    auto xxh3_64 = new XXH3_64Digest();
+    auto xxh128 = new XXH128Digest();
 
     xxh.put(cast(ubyte[])"abcdef");
     xxh.reset();
@@ -562,25 +791,63 @@ alias XXH128Digest = WrapperDigest!XXH3_128;
     }
 
     assert(xxh.length == 4);
+    assert(xxh64.length == 8);
+    assert(xxh3_64.length == 8);
+    assert(xxh128.length == 16);
 
     assert(xxh.digest("") == cast(ubyte[]) hexString!"02cc5d05");
+    assert(xxh64.digest("") == cast(ubyte[]) hexString!"EF46DB3751D8E999");
+    assert(xxh3_64.digest("") == cast(ubyte[]) hexString!"2D06800538D394C2");
+    assert(xxh128.digest("") == cast(ubyte[]) hexString!"99AA06D3014798D86001C324468D497F");
 
     assert(xxh.digest("a") == cast(ubyte[]) hexString!"550d7456");
+    assert(xxh64.digest("a") == cast(ubyte[]) hexString!"D24EC4F1A98C6E5B");
+    assert(xxh3_64.digest("a") == cast(ubyte[]) hexString!"E6C632B61E964E1F");
+    assert(xxh128.digest("a") == cast(ubyte[]) hexString!"A96FAF705AF16834E6C632B61E964E1F");
 
     assert(xxh.digest("abc") == cast(ubyte[]) hexString!"32D153FF");
+    assert(xxh64.digest("abc") == cast(ubyte[]) hexString!"44BC2CF5AD770999");
+    assert(xxh3_64.digest("abc") == cast(ubyte[]) hexString!"78AF5F94892F3950");
+    assert(xxh128.digest("abc") == cast(ubyte[]) hexString!"06B05AB6733A618578AF5F94892F3950");
 
     assert(xxh.digest("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq")
            == cast(ubyte[]) hexString!"89ea60c3");
+    assert(xxh64.digest("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq")
+           == cast(ubyte[]) hexString!"F06103773E8585DF");
+    assert(xxh3_64.digest("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq")
+           == cast(ubyte[]) hexString!"5BBCBBABCDCC3D3F");
+    assert(xxh128.digest("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq")
+           == cast(ubyte[]) hexString!"3D62D22A5169B016C0D894FD4828A1A7");
 
     assert(xxh.digest("message digest") == cast(ubyte[]) hexString!"7c948494");
+    assert(xxh64.digest("message digest") == cast(ubyte[]) hexString!"066ED728FCEEB3BE");
+    assert(xxh3_64.digest("message digest") == cast(ubyte[]) hexString!"160D8E9329BE94F9");
+    assert(xxh128.digest("message digest") == cast(ubyte[]) hexString!"34AB715D95E3B6490ABFABECB8E3A424");
 
-    assert(xxh.digest("abcdefghijklmnopqrstuvwxyz")
-           == cast(ubyte[]) hexString!"63a14d5f");
+    assert(xxh.digest("abcdefghijklmnopqrstuvwxyz") == cast(ubyte[]) hexString!"63a14d5f");
+    assert(xxh64.digest("abcdefghijklmnopqrstuvwxyz") == cast(ubyte[]) hexString!"CFE1F278FA89835C");
+    assert(xxh3_64.digest("abcdefghijklmnopqrstuvwxyz") == cast(ubyte[]) hexString!"810F9CA067FBB90C");
+    assert(xxh128.digest("abcdefghijklmnopqrstuvwxyz") == cast(ubyte[]) hexString!"DB7CA44E84843D67EBE162220154E1E6");
 
     assert(xxh.digest("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789")
            == cast(ubyte[]) hexString!"9c285e64");
+    assert(xxh64.digest("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789")
+           == cast(ubyte[]) hexString!"AAA46907D3047814");
+    assert(xxh3_64.digest("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789")
+           == cast(ubyte[]) hexString!"643542BB51639CB2");
+    assert(xxh128.digest("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789")
+           == cast(ubyte[]) hexString!"5BCB80B619500686A3C0560BD47A4FFB");
 
     assert(xxh.digest("1234567890123456789012345678901234567890",
                                    "1234567890123456789012345678901234567890")
            == cast(ubyte[]) hexString!"9c05f475");
+    assert(xxh64.digest("1234567890123456789012345678901234567890",
+                                   "1234567890123456789012345678901234567890")
+           == cast(ubyte[]) hexString!"E04A477F19EE145D");
+    assert(xxh3_64.digest("1234567890123456789012345678901234567890",
+                                   "1234567890123456789012345678901234567890")
+           == cast(ubyte[]) hexString!"7F58AA2520C681F9");
+    assert(xxh128.digest("1234567890123456789012345678901234567890",
+                                   "1234567890123456789012345678901234567890")
+           == cast(ubyte[]) hexString!"08DD22C3DDC34CE640CB8D6AC672DCB8");
 }
