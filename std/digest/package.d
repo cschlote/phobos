@@ -106,9 +106,9 @@ import std.traits;
         foreach (name; args[1 .. $])
         {
             digestFile!MD5(name);
-            digestFile!Xxh32(name);
-            digestFile!Xxh64(name);
-            digestFile!Xxh128(name);
+            digestFile!XXH_32(name);
+            digestFile!XXH_64(name);
+            digestFile!XXH3_128(name);
             digestFile!SHA1(name);
             digestFile!CRC32(name);
         }
@@ -138,7 +138,7 @@ import std.traits;
     void uMain(string[] args)
     {
         MD5 md5;
-        Xxh64 xxh64;
+        XXH_64 xxh64;
         SHA1 sha1;
         CRC32 crc32;
 
@@ -382,9 +382,9 @@ template hasPeek(T)
 {
     import std.digest.crc, std.digest.md, std.digest.xxh;
     assert(!hasPeek!(MD5));
-    assert(!hasPeek!(Xxh32));
-    assert(!hasPeek!(Xxh64));
-    assert(!hasPeek!(Xxh128));
+    assert(!hasPeek!(XXH_32));
+    assert(!hasPeek!(XXH_64));
+    assert(!hasPeek!(XXH3_128));
     assert(hasPeek!CRC32);
 }
 ///
@@ -531,9 +531,9 @@ if (allSatisfy!(isArray, typeof(data)))
 {
     import std.digest.crc, std.digest.md, std.digest.xxh, std.digest.sha;
     auto md5   = digest!MD5(  "The quick brown fox jumps over the lazy dog");
-    auto xxh32 = digest!Xxh32(  "The quick brown fox jumps over the lazy dog");
-    auto xxh64 = digest!Xxh64(  "The quick brown fox jumps over the lazy dog");
-    auto xxh128 = digest!Xxh128(  "The quick brown fox jumps over the lazy dog");
+    auto xxh32 = digest!XXH_32(  "The quick brown fox jumps over the lazy dog");
+    auto xxh64 = digest!XXH_64(  "The quick brown fox jumps over the lazy dog");
+    auto xxh128 = digest!XXH3_128(  "The quick brown fox jumps over the lazy dog");
     auto sha1  = digest!SHA1( "The quick brown fox jumps over the lazy dog");
     auto crc32 = digest!CRC32("The quick brown fox jumps over the lazy dog");
     assert(toHexString(crc32) == "39A34F41");
@@ -913,12 +913,12 @@ if (isDigest!T)
 unittest
 {
     import std.digest.md : MD5;
-    import std.digest.xxh : Xxh32, Xxh64, Xxh128;
+    import std.digest.xxh : XXH_32, XXH_64, XXH3_128;
     import std.digest.sha : SHA1, SHA256, SHA512;
     assert(digestLength!MD5 == 16);
-    assert(digestLength!Xxh32 == 4);
-    assert(digestLength!Xxh64 == 8);
-    assert(digestLength!Xxh128 == 16);
+    assert(digestLength!XXH_32 == 4);
+    assert(digestLength!XXH_64 == 8);
+    assert(digestLength!XXH3_128 == 16);
     assert(digestLength!SHA1 == 20);
     assert(digestLength!SHA256 == 32);
     assert(digestLength!SHA512 == 64);

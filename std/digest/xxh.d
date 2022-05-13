@@ -8,12 +8,12 @@ $(DIVC quickindex,
 $(BOOKTABLE ,
 $(TR $(TH Category) $(TH Functions)
 )
-$(TR $(TDNW Template API) $(TD $(MYREF XXH)
+$(TR $(TDNW Template API) $(TD $(MYREF XXHTemplate)
 )
 )
 $(TR $(TDNW OOP API) $(TD $(MYREF XXH32Digest))
 )
-$(TR $(TDNW Helpers) $(TD $(MYREF xxhOf))
+$(TR $(TDNW Helpers) $(TD $(MYREF xxh32Of))
 )
 )
 )
@@ -54,7 +54,7 @@ public import std.digest;
 
     //Feeding data
     ubyte[1024] data;
-    Xxh32 xxh;
+    XXH_32 xxh;
     xxh.start();
     xxh.put(data[]);
     xxh.start(); //Start again
@@ -111,7 +111,7 @@ struct XXH3_state_t;
 enum XXH_errorcode {
     XXH_OK = 0, /*!< OK */
     XXH_ERROR   /*!< Error */
-};
+}
 
 extern (C) {
     uint XXH_versionNumber ();
@@ -197,10 +197,10 @@ else pragma(inline, true) private pure @nogc nothrow @safe
 }
 
 /**
- * Template API XXH implementation.
+ * Template API XXHTemplate implementation. Uses parameters to configure for number of bits and XXH variant (classic or XXH3)
  * See `std.digest` for differences between template and OOP API.
  */
-struct XXH(HASH, STATE)
+struct XXHTemplate(HASH, STATE, bool useXXH3)
 {
     private:
         HASH hash;
@@ -217,7 +217,7 @@ struct XXH(HASH, STATE)
          *
          * Example:
          * ----
-         * XXH dig;
+         * XXHTemplate!(hashtype,statetype,useXXH3) dig;
          * dig.put(cast(ubyte) 0); //single ubyte
          * dig.put(cast(ubyte) 0, cast(ubyte) 0); //variadic
          * ubyte[10] buf;
@@ -231,19 +231,23 @@ struct XXH(HASH, STATE)
             if (state == null) this.start;
             static if (digestSize == 32)
                 ec = XXH32_update(state, data.ptr, data.length);
-            else static if (digestSize == 64)
+            else static if (digestSize == 64 && !useXXH3)
                 ec = XXH64_update(state, data.ptr, data.length);
+            else static if (digestSize == 64 && useXXH3)
+                ec = XXH3_64bits_update(state, data.ptr, data.length);
             else static if (digestSize == 128)
                 ec = XXH3_128bits_update(state, data.ptr, data.length);
+            else 
+                assert (false, "Unknown XXH bitdeep or variant");
             assert (ec == XXH_errorcode.XXH_OK, "Update failed");
         }
 
         /**
-         * Used to (re)initialize the XXH digest.
+         * Used to (re)initialize the XXHTemplate digest.
          *
          * Example:
          * --------
-         * XXH digest;
+         * XXHTemplate digest;
          * digest.start();
          * digest.put(0);
          * --------
@@ -255,13 +259,18 @@ struct XXH(HASH, STATE)
             static if (digestSize == 32) {
                 if (state == null) state = XXH32_createState();
                 ec = XXH32_reset(state, seed);
-            } else static if (digestSize == 64) {
+            } else static if (digestSize == 64 && !useXXH3) {
                 if (state == null) state = XXH64_createState();
                 ec = XXH64_reset(state, seed);
+            } else static if (digestSize == 64 && useXXH3) {
+                if (state == null) state = XXH3_createState();
+                ec = XXH3_64bits_reset(state);
             } else static if (digestSize == 128) {
                 if (state == null) state = XXH3_createState();
                 ec = XXH3_128bits_reset(state);
             }
+            else 
+                assert (false, "Unknown XXH bitdeep or variant");
             //assert (ec == XXH_errorcode.XXH_OK, "reset failed");
         }
 
@@ -276,51 +285,108 @@ struct XXH(HASH, STATE)
                 hash = XXH32_digest(state);
                 if (state != null) ec = XXH32_freeState(state);
                 auto rc = nativeToBigEndian(hash);
-            } else static if (digestSize == 64) {
+            } else static if (digestSize == 64 && !useXXH3) {
                 hash = XXH64_digest(state);
                 if (state != null) ec = XXH64_freeState(state);
+                auto rc = nativeToBigEndian(hash);
+            } else static if (digestSize == 64 && useXXH3) {
+                hash = XXH3_64bits_digest(state);
+                if (state != null) ec = XXH3_freeState(state);
                 auto rc = nativeToBigEndian(hash);
             } else static if (digestSize == 128) {
                 hash = XXH3_128bits_digest(state);
                 if (state != null) ec = XXH3_freeState(state);
                 HASH rc;
-                rc.low64 = nativeToBigEndian(hash.low64);
-                rc.high64 = nativeToBigEndian(hash.high64);
+                // Note: low64 and high64 are intentionally exchanged!
+                rc.low64 = nativeToBigEndian(hash.high64);
+                rc.high64 = nativeToBigEndian(hash.low64);
             }
             assert (ec == XXH_errorcode.XXH_OK, "freestate failed");
             state = null;
             
             return (cast(ubyte*) &rc)[0 .. rc.sizeof];
         }
-        ///
-        @safe unittest
-        {
-            //Simple example
-            XXH!(HASH, STATE) hash1;
-            hash1.start();
-            hash1.put(cast(ubyte) 0);
-            auto result = hash1.finish();
-        }
 }
-alias Xxh32 = XXH!(XXH32_hash_t, XXH32_state_t);
-alias Xxh64 = XXH!(XXH64_hash_t, XXH64_state_t);
-//alias Xxh3_64 = XXH!(XXH64_hash_t, XXH64_state_t);
-alias Xxh128 = XXH!(XXH128_hash_t, XXH3_state_t);
+alias XXH_32 = XXHTemplate!(XXH32_hash_t, XXH32_state_t, false);
+alias XXH_64 = XXHTemplate!(XXH64_hash_t, XXH64_state_t, false);
+alias XXH3_64 = XXHTemplate!(XXH64_hash_t, XXH3_state_t, true);
+alias XXH3_128 = XXHTemplate!(XXH128_hash_t, XXH3_state_t, true);
+///
+@safe unittest
+{
+    //Simple example
+    XXH_32 hash1;
+    hash1.start();
+    hash1.put(cast(ubyte) 0);
+    auto result = hash1.finish();
+}
+///
+@safe unittest
+{
+    //Simple example
+    XXH_64 hash1;
+    hash1.start();
+    hash1.put(cast(ubyte) 0);
+    auto result = hash1.finish();
+}
+///
+@safe unittest
+{
+    //Simple example
+    XXH3_64 hash1;
+    hash1.start();
+    hash1.put(cast(ubyte) 0);
+    auto result = hash1.finish();
+}
+///
+@safe unittest
+{
+    //Simple example
+    XXH3_128 hash1;
+    hash1.start();
+    hash1.put(cast(ubyte) 0);
+    auto result = hash1.finish();
+}
 
 ///
 @safe unittest
 {
-    //Simple example, hashing a string using xxhOf helper function
-    auto hash = xxhOf("abc");
+    //Simple example, hashing a string using xxh32Of helper function
+    auto hash = xxh32Of("abc");
     //Let's get a hash string
     assert(toHexString(hash) == "32D153FF");
+}
+///
+@safe unittest
+{
+    //Simple example, hashing a string using xxh32Of helper function
+    auto hash = xxh64Of("abc");
+    //Let's get a hash string
+    assert(toHexString(hash) == "44BC2CF5AD770999" ); // XXH64
+}
+///
+@safe unittest
+{
+    //Simple example, hashing a string using xxh32Of helper function
+    auto hash = xxh3_64Of("abc");
+    //Let's get a hash string
+    assert(toHexString(hash) == "78AF5F94892F3950" ); // XXH3/64
+}
+///
+@safe unittest
+{
+    //Simple example, hashing a string using xxh32Of helper function
+    auto hash = xxh128Of("abc");
+    //Let's get a hash string
+    assert(toHexString(hash) == "06B05AB6733A618578AF5F94892F3950");
+                                 
 }
 
 ///
 @safe unittest
 {
     //Using the basic API
-    Xxh32 hash;
+    XXH_32 hash;
     hash.start();
     ubyte[1024] data;
     //Initialize data here...
@@ -337,7 +403,7 @@ alias Xxh128 = XXH!(XXH128_hash_t, XXH3_state_t);
     {
         hash.put(cast(ubyte) 0);
     }
-    Xxh32 xxh;
+    XXH_32 xxh;
     xxh.start();
     doSomething(xxh);
     auto hash = xxh.finish;
@@ -347,9 +413,9 @@ alias Xxh128 = XXH!(XXH128_hash_t, XXH3_state_t);
 ///
 @safe unittest
 {
-    assert(isDigest!Xxh32);
-    assert(isDigest!Xxh64);
-    assert(isDigest!Xxh128);
+    assert(isDigest!XXH_32);
+    assert(isDigest!XXH_64);
+    assert(isDigest!XXH3_128);
 }
 
 @system unittest
@@ -359,34 +425,34 @@ alias Xxh128 = XXH!(XXH128_hash_t, XXH3_state_t);
 
     ubyte[4] digest;
 
-    Xxh32 xxh;
+    XXH_32 xxh;
     xxh.put(cast(ubyte[])"abcdef");
     xxh.start();
     xxh.put(cast(ubyte[])"");
     assert(xxh.finish() == cast(ubyte[]) hexString!"02cc5d05");
 
-    digest = xxhOf("");
+    digest = xxh32Of("");
     assert(digest == cast(ubyte[]) hexString!"02cc5d05");
 
-    digest = xxhOf("a");
+    digest = xxh32Of("a");
     assert(digest == cast(ubyte[]) hexString!"550d7456");
 
-    digest = xxhOf("abc");
+    digest = xxh32Of("abc");
     assert(digest == cast(ubyte[]) hexString!"32D153FF");
 
-    digest = xxhOf("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq");
+    digest = xxh32Of("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq");
     assert(digest == cast(ubyte[]) hexString!"89ea60c3");
 
-    digest = xxhOf("message digest");
+    digest = xxh32Of("message digest");
     assert(digest == cast(ubyte[]) hexString!"7c948494");
 
-    digest = xxhOf("abcdefghijklmnopqrstuvwxyz");
+    digest = xxh32Of("abcdefghijklmnopqrstuvwxyz");
     assert(digest == cast(ubyte[]) hexString!"63a14d5f");
 
-    digest = xxhOf("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789");
+    digest = xxh32Of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789");
     assert(digest == cast(ubyte[]) hexString!"9c285e64");
 
-    digest = xxhOf("1234567890123456789012345678901234567890"~
+    digest = xxh32Of("1234567890123456789012345678901234567890"~
                     "1234567890123456789012345678901234567890");
     assert(digest == cast(ubyte[]) hexString!"9c05f475");
 
@@ -396,11 +462,11 @@ alias Xxh128 = XXH!(XXH128_hash_t, XXH3_state_t);
 
     ubyte[] onemilliona = new ubyte[1000000];
     onemilliona[] = 'a';
-    digest = xxhOf(onemilliona);
+    digest = xxh32Of(onemilliona);
     assert(digest == cast(ubyte[]) hexString!"E1155920", "Got " ~ toHexString(digest));
 
     auto oneMillionRange = repeat!ubyte(cast(ubyte)'a', 1000000);
-    digest = xxhOf(oneMillionRange);
+    digest = xxh32Of(oneMillionRange);
     assert(digest == cast(ubyte[]) hexString!"E1155920", "Got " ~ toHexString(digest));
 }
 
@@ -409,16 +475,31 @@ alias Xxh128 = XXH!(XXH128_hash_t, XXH3_state_t);
  * XXH implementation.
  */
 //simple alias doesn't work here, hope this gets inlined...
-auto xxhOf(T...)(T data)
+auto xxh32Of(T...)(T data)
 {
-    return digest!(Xxh32, T)(data);
+    return digest!(XXH_32, T)(data);
+}
+/// Ditto
+auto xxh64Of(T...)(T data)
+{
+    return digest!(XXH_64, T)(data);
+}
+/// Ditto
+auto xxh3_64Of(T...)(T data)
+{
+    return digest!(XXH3_64, T)(data);
+}
+/// Ditto
+auto xxh128Of(T...)(T data)
+{
+    return digest!(XXH3_128, T)(data);
 }
 
 ///
 @safe unittest
 {
-    auto hash = xxhOf("abc");
-    assert(hash == digest!Xxh32("abc"));
+    auto hash = xxh32Of("abc");
+    assert(hash == digest!XXH_32("abc"));
 }
 
 /**
@@ -428,9 +509,9 @@ auto xxhOf(T...)(T data)
  * This is an alias for $(D $(REF WrapperDigest, std,digest)!XXH), see
  * there for more information.
  */
-alias XXH32Digest = WrapperDigest!Xxh32;
-alias XXH64Digest = WrapperDigest!Xxh64;
-alias XXH128Digest = WrapperDigest!Xxh128;
+alias XXH32Digest = WrapperDigest!XXH_32;
+alias XXH64Digest = WrapperDigest!XXH_64;
+alias XXH128Digest = WrapperDigest!XXH3_128;
 
 ///
 @safe unittest
