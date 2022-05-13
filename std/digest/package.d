@@ -89,7 +89,8 @@ import std.traits;
 @system unittest
 {
     //Generating the hashes of a file, idiomatic D way
-    import std.digest.crc, std.digest.md, std.digest.xxh, std.digest.sha;
+    import std.digest.crc, std.digest.md, std.digest.sha;
+    //FIXME import std.digest.xxh
     import std.stdio;
 
     // Digests a file and prints the result.
@@ -106,9 +107,9 @@ import std.traits;
         foreach (name; args[1 .. $])
         {
             digestFile!MD5(name);
-            digestFile!XXH_32(name);
-            digestFile!XXH_64(name);
-            digestFile!XXH3_128(name);
+            //FIXME digestFile!XXH_32(name);
+            //FIXME digestFile!XXH_64(name);
+            //FIXME digestFile!XXH3_128(name);
             digestFile!SHA1(name);
             digestFile!CRC32(name);
         }
@@ -706,10 +707,11 @@ interface Digest
 @system unittest
 {
     import std.digest.crc, std.digest.md, std.digest.xxh, std.digest.sha;
+    //FIXME import std.digest.md;
     ubyte[] md5   = (new MD5Digest()).digest("The quick brown fox jumps over the lazy dog");
-    ubyte[] xxh32 = (new XXH32Digest()).digest("The quick brown fox jumps over the lazy dog");
-    ubyte[] xxh64 = (new XXH64Digest()).digest("The quick brown fox jumps over the lazy dog");
-    ubyte[] xxh128 = (new XXH128Digest()).digest("The quick brown fox jumps over the lazy dog");
+    //FIXME ubyte[] xxh32 = (new XXH32Digest()).digest("The quick brown fox jumps over the lazy dog");
+    //FIXME ubyte[] xxh64 = (new XXH64Digest()).digest("The quick brown fox jumps over the lazy dog");
+    //FIXME ubyte[] xxh128 = (new XXH128Digest()).digest("The quick brown fox jumps over the lazy dog");
     ubyte[] sha1  = (new SHA1Digest()).digest("The quick brown fox jumps over the lazy dog");
     ubyte[] crc32 = (new CRC32Digest()).digest("The quick brown fox jumps over the lazy dog");
     assert(crcHexString(crc32) == "414FA339");
