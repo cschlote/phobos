@@ -115,7 +115,8 @@ enum XXH_errorcode {
 
 uint XXH_expectedVersionNumber ()  @trusted pure nothrow @nogc { return XXH_VERSION_NUMBER; }
 
-unittest {
+@safe unittest
+{
     import std.format : format;
     assert(XXH_expectedVersionNumber() == XXH_versionNumber(),
         format(
@@ -149,23 +150,29 @@ extern (C) {
 
     XXH64_hash_t XXH3_64bits(const void* input, size_t length) @trusted pure nothrow @nogc;
     XXH64_hash_t XXH3_64bits_withSeed(const void* input, size_t length, XXH64_hash_t seed) @trusted pure nothrow @nogc;
-    XXH64_hash_t XXH3_64bits_withSecret(const void* data, size_t len, const void* secret, size_t secretSize) @trusted pure nothrow @nogc;
+    XXH64_hash_t XXH3_64bits_withSecret(const void* data, size_t len, const void* secret, size_t secretSize)
+        @trusted pure nothrow @nogc;
     XXH3_state_t* XXH3_createState() @trusted pure nothrow @nogc;
     XXH_errorcode XXH3_freeState(XXH3_state_t* statePtr) @trusted pure nothrow @nogc;
     void XXH3_copyState(XXH3_state_t* dst_state, const XXH3_state_t* src_state) @trusted pure nothrow @nogc;
     XXH_errorcode XXH3_64bits_reset(XXH3_state_t* statePtr) @trusted pure nothrow @nogc;
     XXH_errorcode XXH3_64bits_reset_withSeed(XXH3_state_t* statePtr, XXH64_hash_t seed) @trusted pure nothrow @nogc;
-    XXH_errorcode XXH3_64bits_reset_withSecret(XXH3_state_t* statePtr, const void* secret, size_t secretSize) @trusted pure nothrow @nogc;
-    XXH_errorcode XXH3_64bits_update (XXH3_state_t* statePtr, const void* input, size_t length) @trusted pure nothrow @nogc;
+    XXH_errorcode XXH3_64bits_reset_withSecret(XXH3_state_t* statePtr, const void* secret, size_t secretSize)
+        @trusted pure nothrow @nogc;
+    XXH_errorcode XXH3_64bits_update (XXH3_state_t* statePtr, const void* input, size_t length)
+        @trusted pure nothrow @nogc;
     XXH64_hash_t  XXH3_64bits_digest (const XXH3_state_t* statePtr) @trusted pure nothrow @nogc;
 
     XXH128_hash_t XXH3_128bits(const void* data, size_t len) @trusted pure nothrow @nogc;
     XXH128_hash_t XXH3_128bits_withSeed(const void* data, size_t len, XXH64_hash_t seed) @trusted pure nothrow @nogc;
-    XXH128_hash_t XXH3_128bits_withSecret(const void* data, size_t len, const void* secret, size_t secretSize) @trusted pure nothrow @nogc;
+    XXH128_hash_t XXH3_128bits_withSecret(const void* data, size_t len, const void* secret, size_t secretSize)
+        @trusted pure nothrow @nogc;
     XXH_errorcode XXH3_128bits_reset(XXH3_state_t* statePtr) @trusted pure nothrow @nogc;
     XXH_errorcode XXH3_128bits_reset_withSeed(XXH3_state_t* statePtr, XXH64_hash_t seed) @trusted pure nothrow @nogc;
-    XXH_errorcode XXH3_128bits_reset_withSecret(XXH3_state_t* statePtr, const void* secret, size_t secretSize) @trusted pure nothrow @nogc;
-    XXH_errorcode XXH3_128bits_update (XXH3_state_t* statePtr, const void* input, size_t length) @trusted pure nothrow @nogc;
+    XXH_errorcode XXH3_128bits_reset_withSecret(XXH3_state_t* statePtr, const void* secret, size_t secretSize)
+        @trusted pure nothrow @nogc;
+    XXH_errorcode XXH3_128bits_update (XXH3_state_t* statePtr, const void* input, size_t length)
+        @trusted pure nothrow @nogc;
     XXH128_hash_t XXH3_128bits_digest (const XXH3_state_t* statePtr) @trusted pure nothrow @nogc;
 
     int XXH128_isEqual(XXH128_hash_t h1, XXH128_hash_t h2) @trusted pure nothrow @nogc;
@@ -174,16 +181,23 @@ extern (C) {
     XXH128_hash_t XXH128_hashFromCanonical(const XXH128_canonical_t* src) @trusted pure nothrow @nogc;
     XXH128_hash_t XXH128(const void* data, size_t len, XXH64_hash_t seed) @trusted pure nothrow @nogc;
 
-    XXH_errorcode XXH3_generateSecret(void* secretBuffer, size_t secretSize, const void* customSeed, size_t customSeedSize) @trusted pure nothrow @nogc;
+    XXH_errorcode XXH3_generateSecret(void* secretBuffer, size_t secretSize, const void* customSeed,
+        size_t customSeedSize) @trusted pure nothrow @nogc;
     void XXH3_generateSecret_fromSeed(void* secretBuffer, XXH64_hash_t seed) @trusted pure nothrow @nogc;
     XXH64_hash_t  XXH3_64bits_dispatch(const void* input, size_t len) @trusted pure nothrow @nogc;
-    XXH64_hash_t  XXH3_64bits_withSeed_dispatch(const void* input, size_t len, XXH64_hash_t seed) @trusted pure nothrow @nogc;
-    XXH64_hash_t  XXH3_64bits_withSecret_dispatch(const void* input, size_t len, const void* secret, size_t secretLen) @trusted pure nothrow @nogc;
-    XXH_errorcode XXH3_64bits_update_dispatch(XXH3_state_t* state, const void* input, size_t len) @trusted pure nothrow @nogc;
+    XXH64_hash_t  XXH3_64bits_withSeed_dispatch(const void* input, size_t len, XXH64_hash_t seed)
+        @trusted pure nothrow @nogc;
+    XXH64_hash_t  XXH3_64bits_withSecret_dispatch(const void* input, size_t len, const void* secret,
+        size_t secretLen) @trusted pure nothrow @nogc;
+    XXH_errorcode XXH3_64bits_update_dispatch(XXH3_state_t* state, const void* input, size_t len)
+        @trusted pure nothrow @nogc;
     XXH128_hash_t XXH3_128bits_dispatch(const void* input, size_t len) @trusted pure nothrow @nogc;
-    XXH128_hash_t XXH3_128bits_withSeed_dispatch(const void* input, size_t len, XXH64_hash_t seed) @trusted pure nothrow @nogc;
-    XXH128_hash_t XXH3_128bits_withSecret_dispatch(const void* input, size_t len, const void* secret, size_t secretLen) @trusted pure nothrow @nogc;
-    XXH_errorcode XXH3_128bits_update_dispatch(XXH3_state_t* state, const void* input, size_t len) @trusted pure nothrow @nogc;
+    XXH128_hash_t XXH3_128bits_withSeed_dispatch(const void* input, size_t len, XXH64_hash_t seed)
+        @trusted pure nothrow @nogc;
+    XXH128_hash_t XXH3_128bits_withSecret_dispatch(const void* input, size_t len, const void* secret,
+        size_t secretLen) @trusted pure nothrow @nogc;
+    XXH_errorcode XXH3_128bits_update_dispatch(XXH3_state_t* state, const void* input, size_t len)
+        @trusted pure nothrow @nogc;
 }
 
 import core.bitop;
@@ -237,7 +251,6 @@ struct XXHTemplate(HASH, STATE, bool useXXH3)
         void put(scope const(ubyte)[] data...) @trusted pure nothrow @nogc
         {
             XXH_errorcode ec;
-            //assert (state != null, "You must call start before puting bytes.");
             if (state == null) this.start;
             static if (digestSize == 32)
                 ec = XXH32_update(state, data.ptr, data.length);
@@ -248,8 +261,8 @@ struct XXHTemplate(HASH, STATE, bool useXXH3)
             else static if (digestSize == 128)
                 ec = XXH3_128bits_update(state, data.ptr, data.length);
             else
-                assert (false, "Unknown XXH bitdeep or variant");
-            assert (ec == XXH_errorcode.XXH_OK, "Update failed");
+                assert(false, "Unknown XXH bitdeep or variant");
+            assert(ec == XXH_errorcode.XXH_OK, "Update failed");
         }
 
         /**
@@ -257,7 +270,7 @@ struct XXHTemplate(HASH, STATE, bool useXXH3)
          *
          * Example:
          * --------
-         * XXHTemplate digest;
+         * XXHTemplate!(hashtype,statetype,useXXH3) digest;
          * digest.start();
          * digest.put(0);
          * --------
@@ -266,22 +279,29 @@ struct XXHTemplate(HASH, STATE, bool useXXH3)
         {
             this = typeof(this).init;
             XXH_errorcode ec;
-            static if (digestSize == 32) {
+            static if (digestSize == 32)
+            {
                 if (state == null) state = XXH32_createState();
                 ec = XXH32_reset(state, seed);
-            } else static if (digestSize == 64 && !useXXH3) {
+            }
+            else static if (digestSize == 64 && !useXXH3)
+            {
                 if (state == null) state = XXH64_createState();
                 ec = XXH64_reset(state, seed);
-            } else static if (digestSize == 64 && useXXH3) {
+            }
+            else static if (digestSize == 64 && useXXH3)
+            {
                 if (state == null) state = XXH3_createState();
                 ec = XXH3_64bits_reset(state);
-            } else static if (digestSize == 128) {
+            }
+            else static if (digestSize == 128)
+            {
                 if (state == null) state = XXH3_createState();
                 ec = XXH3_128bits_reset(state);
             }
             else
-                assert (false, "Unknown XXH bitdeep or variant");
-            //assert (ec == XXH_errorcode.XXH_OK, "reset failed");
+                assert(false, "Unknown XXH bitdeep or variant");
+            //assert(ec == XXH_errorcode.XXH_OK, "reset failed");
         }
 
         /**
@@ -291,19 +311,26 @@ struct XXHTemplate(HASH, STATE, bool useXXH3)
         ubyte[digestSize/8] finish() @trusted pure nothrow @nogc
         {
             XXH_errorcode ec;
-            static if (digestSize == 32) {
+            static if (digestSize == 32)
+            {
                 hash = XXH32_digest(state);
                 if (state != null) ec = XXH32_freeState(state);
                 auto rc = nativeToBigEndian(hash);
-            } else static if (digestSize == 64 && !useXXH3) {
+            }
+            else static if (digestSize == 64 && !useXXH3)
+            {
                 hash = XXH64_digest(state);
                 if (state != null) ec = XXH64_freeState(state);
                 auto rc = nativeToBigEndian(hash);
-            } else static if (digestSize == 64 && useXXH3) {
+            }
+            else static if (digestSize == 64 && useXXH3)
+            {
                 hash = XXH3_64bits_digest(state);
                 if (state != null) ec = XXH3_freeState(state);
                 auto rc = nativeToBigEndian(hash);
-            } else static if (digestSize == 128) {
+            }
+            else static if (digestSize == 128)
+            {
                 hash = XXH3_128bits_digest(state);
                 if (state != null) ec = XXH3_freeState(state);
                 HASH rc;
@@ -311,12 +338,22 @@ struct XXHTemplate(HASH, STATE, bool useXXH3)
                 rc.low64 = nativeToBigEndian(hash.high64);
                 rc.high64 = nativeToBigEndian(hash.low64);
             }
-            assert (ec == XXH_errorcode.XXH_OK, "freestate failed");
+            assert(ec == XXH_errorcode.XXH_OK, "freestate failed");
             state = null;
 
             return (cast(ubyte*) &rc)[0 .. rc.sizeof];
         }
 }
+///
+@safe unittest
+{
+    // Simple example using the XXH_64 digest
+    XXHTemplate!(XXH64_hash_t, XXH64_state_t, false) hash1;
+    hash1.start();
+    hash1.put(cast(ubyte) 0);
+    auto result = hash1.finish();
+}
+
 alias XXH_32 = XXHTemplate!(XXH32_hash_t, XXH32_state_t, false);
 alias XXH_64 = XXHTemplate!(XXH64_hash_t, XXH64_state_t, false);
 alias XXH3_64 = XXHTemplate!(XXH64_hash_t, XXH3_state_t, true);
