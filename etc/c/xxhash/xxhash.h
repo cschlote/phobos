@@ -3146,7 +3146,13 @@ enum XXH_VECTOR_TYPE /* fake enum */ {
 #  define XXH_AVX512 3
 #  define XXH_NEON   4
 #  define XXH_VSX    5
+
+//#  ifdef __APPLE__ /* PHOBOS FIXME: Detect build on darwin with Xcode, use portable version in this case */
+//#  endif
 #endif
+
+#    define XXH_VECTOR XXH_SCALAR
+
 
 #ifndef XXH_VECTOR    /* can be defined on command line */
 #  if ( \
