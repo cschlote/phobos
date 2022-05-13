@@ -113,6 +113,17 @@ enum XXH_errorcode {
     XXH_ERROR   /*!< Error */
 }
 
+uint XXH_expectedVersionNumber ()  @trusted pure nothrow @nogc { return XXH_VERSION_NUMBER; }
+
+unittest {
+    import std.format : format;
+    assert(XXH_expectedVersionNumber() == XXH_versionNumber(),
+        format(
+            "Upstream C version mismatches expected version (C version is %08x, D expects %08x)",
+            XXH_versionNumber(), XXH_expectedVersionNumber ()
+            ));
+}
+
 extern (C) {
     uint XXH_versionNumber ();
 
@@ -165,7 +176,6 @@ extern (C) {
 
     XXH_errorcode XXH3_generateSecret(void* secretBuffer, size_t secretSize, const void* customSeed, size_t customSeedSize) @trusted pure nothrow @nogc;
     void XXH3_generateSecret_fromSeed(void* secretBuffer, XXH64_hash_t seed) @trusted pure nothrow @nogc;
-    uint XXH_versionNumber ()  @trusted pure nothrow @nogc { return XXH_VERSION_NUMBER; }
     XXH64_hash_t  XXH3_64bits_dispatch(const void* input, size_t len) @trusted pure nothrow @nogc;
     XXH64_hash_t  XXH3_64bits_withSeed_dispatch(const void* input, size_t len, XXH64_hash_t seed) @trusted pure nothrow @nogc;
     XXH64_hash_t  XXH3_64bits_withSecret_dispatch(const void* input, size_t len, const void* secret, size_t secretLen) @trusted pure nothrow @nogc;
