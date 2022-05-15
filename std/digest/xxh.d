@@ -1206,6 +1206,8 @@ XXH3_len_17to128_64b(const(xxh_u8)* input, size_t len,
 }
 
 enum XXH3_MIDSIZE_MAX = 240;
+enum XXH3_MIDSIZE_STARTOFFSET = 3;
+enum XXH3_MIDSIZE_LASTOFFSET  = 17;
 
 private XXH64_hash_t
 XXH3_len_129to240_64b(const(xxh_u8)* input, size_t len,
@@ -1216,8 +1218,6 @@ XXH3_len_129to240_64b(const(xxh_u8)* input, size_t len,
     assert(secretSize >= XXH3_SECRET_SIZE_MIN); cast(void)secretSize;
     assert(128 < len && len <= XXH3_MIDSIZE_MAX);
 
-    enum XXH3_MIDSIZE_STARTOFFSET = 3;
-    enum XXH3_MIDSIZE_LASTOFFSET  = 17;
 
     {   xxh_u64 acc = len * XXH_PRIME64_1;
         const int nbRounds = cast(int) len / 16;
@@ -2016,6 +2016,497 @@ XXH64_hash_t XXH3_64bits_digest (const XXH3_state_t* state)
                                   secret, state.secretLimit + XXH_STRIPE_LEN);
 }
 
+/* ==========================================
+ * XXH3 128 bits (a.k.a XXH128)
+ * ==========================================
+ * XXH3's 128-bit variant has better mixing and strength than the 64-bit variant,
+ * even without counting the significantly larger output size.
+ *
+ * For example, extra steps are taken to avoid the seed-dependent collisions
+ * in 17-240 byte inputs (See XXH3_mix16B and XXH128_mix32B).
+ *
+ * This strength naturally comes at the cost of some speed, especially on short
+ * lengths. Note that longer hashes are about as fast as the 64-bit version
+ * due to it using only a slight modification of the 64-bit loop.
+ *
+ * XXH128 is also more oriented towards 64-bit machines. It is still extremely
+ * fast for a _128-bit_ hash on 32-bit (it usually clears XXH64).
+ */
+private XXH128_hash_t
+XXH3_len_1to3_128b(const xxh_u8* input, size_t len, const xxh_u8* secret, XXH64_hash_t seed)
+@trusted pure nothrow @nogc
+{
+    /* A doubled version of 1to3_64b with different constants. */
+    assert(input != null);
+    assert(1 <= len && len <= 3);
+    assert(secret != null);
+    /*
+     * len = 1: combinedl = { input[0], 0x01, input[0], input[0] }
+     * len = 2: combinedl = { input[1], 0x02, input[0], input[1] }
+     * len = 3: combinedl = { input[2], 0x03, input[0], input[1] }
+     */
+    {   const xxh_u8 c1 = input[0];
+        const xxh_u8 c2 = input[len >> 1];
+        const xxh_u8 c3 = input[len - 1];
+        const xxh_u32 combinedl = (cast(xxh_u32)c1 <<16) | (cast(xxh_u32)c2 << 24)
+                                | (cast(xxh_u32)c3 << 0) | (cast(xxh_u32)len << 8);
+        const xxh_u32 combinedh = XXH_rotl32(XXH_swap32(combinedl), 13);
+        const xxh_u64 bitflipl = (XXH_readLE32(secret) ^ XXH_readLE32(secret+4)) + seed;
+        const xxh_u64 bitfliph = (XXH_readLE32(secret+8) ^ XXH_readLE32(secret+12)) - seed;
+        const xxh_u64 keyed_lo = cast(xxh_u64)combinedl ^ bitflipl;
+        const xxh_u64 keyed_hi = cast(xxh_u64)combinedh ^ bitfliph;
+        XXH128_hash_t h128;
+        h128.low64  = XXH64_avalanche(keyed_lo);
+        h128.high64 = XXH64_avalanche(keyed_hi);
+        return h128;
+    }
+}
+private XXH128_hash_t
+XXH3_len_4to8_128b(const xxh_u8* input, size_t len, const xxh_u8* secret, XXH64_hash_t seed)
+@trusted pure nothrow @nogc
+{
+    assert(input != null);
+    assert(secret != null);
+    assert(4 <= len && len <= 8);
+    seed ^= cast(xxh_u64)XXH_swap32(cast(xxh_u32)seed) << 32;
+    {   const xxh_u32 input_lo = XXH_readLE32(input);
+        const xxh_u32 input_hi = XXH_readLE32(input + len - 4);
+        const xxh_u64 input_64 = input_lo + (cast(xxh_u64)input_hi << 32);
+        const xxh_u64 bitflip = (XXH_readLE64(secret+16) ^ XXH_readLE64(secret+24)) + seed;
+        const xxh_u64 keyed = input_64 ^ bitflip;
+
+        /* Shift len to the left to ensure it is even, this avoids even multiplies. */
+        XXH128_hash_t m128 = XXH_mult64to128(keyed, XXH_PRIME64_1 + (len << 2));
+
+        m128.high64 += (m128.low64 << 1);
+        m128.low64  ^= (m128.high64 >> 3);
+
+        m128.low64   = XXH_xorshift64(m128.low64, 35);
+        m128.low64  *= 0x9FB21C651E98DF25;
+        m128.low64   = XXH_xorshift64(m128.low64, 28);
+        m128.high64  = XXH3_avalanche(m128.high64);
+        return m128;
+    }
+}
+private XXH128_hash_t
+XXH3_len_9to16_128b(const xxh_u8* input, size_t len, const xxh_u8* secret, XXH64_hash_t seed)
+@trusted pure nothrow @nogc
+{
+    assert(input != null);
+    assert(secret != null);
+    assert(9 <= len && len <= 16);
+    {   const xxh_u64 bitflipl = (XXH_readLE64(secret+32) ^ XXH_readLE64(secret+40)) - seed;
+        const xxh_u64 bitfliph = (XXH_readLE64(secret+48) ^ XXH_readLE64(secret+56)) + seed;
+        const xxh_u64 input_lo = XXH_readLE64(input);
+        xxh_u64       input_hi = XXH_readLE64(input + len - 8);
+        XXH128_hash_t m128 = XXH_mult64to128(input_lo ^ input_hi ^ bitflipl, XXH_PRIME64_1);
+        /*
+         * Put len in the middle of m128 to ensure that the length gets mixed to
+         * both the low and high bits in the 128x64 multiply below.
+         */
+        m128.low64 += cast(xxh_u64)(len - 1) << 54;
+        input_hi   ^= bitfliph;
+        /*
+         * Add the high 32 bits of input_hi to the high 32 bits of m128, then
+         * add the long product of the low 32 bits of input_hi and XXH_PRIME32_2 to
+         * the high 64 bits of m128.
+         *
+         * The best approach to this operation is different on 32-bit and 64-bit.
+         */
+        if ((void *).sizeof < (xxh_u64).sizeof) { /* 32-bit */
+            /*
+             * 32-bit optimized version, which is more readable.
+             *
+             * On 32-bit, it removes an ADC and delays a dependency between the two
+             * halves of m128.high64, but it generates an extra mask on 64-bit.
+             */
+            m128.high64 += (input_hi & 0xFFFFFFFF00000000) + XXH_mult32to64(cast(xxh_u32)input_hi, XXH_PRIME32_2);
+        } else {
+            /*
+             * 64-bit optimized (albeit more confusing) version.
+             *
+             * Uses some properties of addition and multiplication to remove the mask:
+             *
+             * Let:
+             *    a = input_hi.lo = (input_hi & 0x00000000FFFFFFFF)
+             *    b = input_hi.hi = (input_hi & 0xFFFFFFFF00000000)
+             *    c = XXH_PRIME32_2
+             *
+             *    a + (b * c)
+             * Inverse Property: x + y - x == y
+             *    a + (b * (1 + c - 1))
+             * Distributive Property: x * (y + z) == (x * y) + (x * z)
+             *    a + (b * 1) + (b * (c - 1))
+             * Identity Property: x * 1 == x
+             *    a + b + (b * (c - 1))
+             *
+             * Substitute a, b, and c:
+             *    input_hi.hi + input_hi.lo + ((xxh_u64)input_hi.lo * (XXH_PRIME32_2 - 1))
+             *
+             * Since input_hi.hi + input_hi.lo == input_hi, we get this:
+             *    input_hi + ((xxh_u64)input_hi.lo * (XXH_PRIME32_2 - 1))
+             */
+            m128.high64 += input_hi + XXH_mult32to64(cast(xxh_u32)input_hi, XXH_PRIME32_2 - 1);
+        }
+        /* m128 ^= XXH_swap64(m128 >> 64); */
+        m128.low64  ^= XXH_swap64(m128.high64);
+
+        {   /* 128x64 multiply: h128 = m128 * XXH_PRIME64_2; */
+            XXH128_hash_t h128 = XXH_mult64to128(m128.low64, XXH_PRIME64_2);
+            h128.high64 += m128.high64 * XXH_PRIME64_2;
+
+            h128.low64   = XXH3_avalanche(h128.low64);
+            h128.high64  = XXH3_avalanche(h128.high64);
+            return h128;
+    }   }
+}
+private XXH128_hash_t
+XXH3_len_0to16_128b(const xxh_u8* input, size_t len, const xxh_u8* secret, XXH64_hash_t seed)
+@trusted pure nothrow @nogc
+{
+    assert(len <= 16);
+    {   if (len > 8) return XXH3_len_9to16_128b(input, len, secret, seed);
+        if (len >= 4) return XXH3_len_4to8_128b(input, len, secret, seed);
+        if (len) return XXH3_len_1to3_128b(input, len, secret, seed);
+        {   XXH128_hash_t h128;
+            const xxh_u64 bitflipl = XXH_readLE64(secret+64) ^ XXH_readLE64(secret+72);
+            const xxh_u64 bitfliph = XXH_readLE64(secret+80) ^ XXH_readLE64(secret+88);
+            h128.low64 = XXH64_avalanche(seed ^ bitflipl);
+            h128.high64 = XXH64_avalanche( seed ^ bitfliph);
+            return h128;
+    }   }
+}
+private XXH128_hash_t
+XXH128_mix32B(XXH128_hash_t acc, const xxh_u8* input_1, const xxh_u8* input_2,
+              const xxh_u8* secret, XXH64_hash_t seed)
+@trusted pure nothrow @nogc
+{
+    acc.low64  += XXH3_mix16B (input_1, secret+0, seed);
+    acc.low64  ^= XXH_readLE64(input_2) + XXH_readLE64(input_2 + 8);
+    acc.high64 += XXH3_mix16B (input_2, secret+16, seed);
+    acc.high64 ^= XXH_readLE64(input_1) + XXH_readLE64(input_1 + 8);
+    return acc;
+}
+
+private XXH128_hash_t
+XXH3_len_17to128_128b(const xxh_u8*  input, size_t len,
+                      const xxh_u8*  secret, size_t secretSize,
+                      XXH64_hash_t seed)
+@trusted pure nothrow @nogc
+{
+    assert(secretSize >= XXH3_SECRET_SIZE_MIN); cast(void)secretSize;
+    assert(16 < len && len <= 128);
+
+    {   XXH128_hash_t acc;
+        acc.low64 = len * XXH_PRIME64_1;
+        acc.high64 = 0;
+
+        static if (XXH_SIZE_OPT >= 1)
+        {
+            /* Smaller, but slightly slower. */
+            size_t i = (len - 1) / 32;
+            do {
+                acc = XXH128_mix32B(acc, input+16*i, input+len-16*(i+1), secret+32*i, seed);
+            } while (i-- != 0);
+        }
+        else 
+        {
+            if (len > 32) {
+                if (len > 64) {
+                    if (len > 96) {
+                        acc = XXH128_mix32B(acc, input+48, input+len-64, secret+96, seed);
+                    }
+                    acc = XXH128_mix32B(acc, input+32, input+len-48, secret+64, seed);
+                }
+                acc = XXH128_mix32B(acc, input+16, input+len-32, secret+32, seed);
+            }
+            acc = XXH128_mix32B(acc, input, input+len-16, secret, seed);
+        }
+        {   XXH128_hash_t h128;
+            h128.low64  = acc.low64 + acc.high64;
+            h128.high64 = (acc.low64    * XXH_PRIME64_1)
+                        + (acc.high64   * XXH_PRIME64_4)
+                        + ((len - seed) * XXH_PRIME64_2);
+            h128.low64  = XXH3_avalanche(h128.low64);
+            h128.high64 = cast(XXH64_hash_t)0 - XXH3_avalanche(h128.high64);
+            return h128;
+        }
+    }
+}
+
+private XXH128_hash_t
+XXH3_len_129to240_128b(const xxh_u8*  input, size_t len,
+                       const xxh_u8*  secret, size_t secretSize,
+                       XXH64_hash_t seed)
+@trusted pure nothrow @nogc
+{
+    assert(secretSize >= XXH3_SECRET_SIZE_MIN); cast(void)secretSize;
+    assert(128 < len && len <= XXH3_MIDSIZE_MAX);
+
+    {   XXH128_hash_t acc;
+        const int nbRounds = cast(int)len / 32;
+        int i;
+        acc.low64 = len * XXH_PRIME64_1;
+        acc.high64 = 0;
+        for (i=0; i<4; i++) {
+            acc = XXH128_mix32B(acc,
+                                input  + (32 * i),
+                                input  + (32 * i) + 16,
+                                secret + (32 * i),
+                                seed);
+        }
+        acc.low64 = XXH3_avalanche(acc.low64);
+        acc.high64 = XXH3_avalanche(acc.high64);
+        assert(nbRounds >= 4);
+        for (i=4 ; i < nbRounds; i++) {
+            acc = XXH128_mix32B(acc,
+                                input + (32 * i),
+                                input + (32 * i) + 16,
+                                secret + XXH3_MIDSIZE_STARTOFFSET + (32 * (i - 4)),
+                                seed);
+        }
+        /* last bytes */
+        acc = XXH128_mix32B(acc,
+                            input + len - 16,
+                            input + len - 32,
+                            secret + XXH3_SECRET_SIZE_MIN - XXH3_MIDSIZE_LASTOFFSET - 16,
+                            0 - seed);
+
+        {   XXH128_hash_t h128;
+            h128.low64  = acc.low64 + acc.high64;
+            h128.high64 = (acc.low64    * XXH_PRIME64_1)
+                        + (acc.high64   * XXH_PRIME64_4)
+                        + ((len - seed) * XXH_PRIME64_2);
+            h128.low64  = XXH3_avalanche(h128.low64);
+            h128.high64 = cast(XXH64_hash_t)0 - XXH3_avalanche(h128.high64);
+            return h128;
+        }
+    }
+}
+
+private XXH128_hash_t
+XXH3_hashLong_128b_internal(const void*  input, size_t len,
+                            const xxh_u8*  secret, size_t secretSize,
+                            XXH3_f_accumulate_512 f_acc512,
+                            XXH3_f_scrambleAcc f_scramble)
+@trusted pure nothrow @nogc
+{
+    align(XXH_ACC_ALIGN) xxh_u64[XXH_ACC_NB] acc = XXH3_INIT_ACC;
+
+    XXH3_hashLong_internal_loop(&acc[0], cast(const xxh_u8*)input, len, secret, secretSize, f_acc512, f_scramble);
+
+    /* converge into final hash */
+    static assert((acc).sizeof == 64);
+    assert(secretSize >= (acc).sizeof + XXH_SECRET_MERGEACCS_START);
+    {   XXH128_hash_t h128;
+        h128.low64  = XXH3_mergeAccs(&acc[0],
+                                     secret + XXH_SECRET_MERGEACCS_START,
+                                     cast(xxh_u64)len * XXH_PRIME64_1);
+        h128.high64 = XXH3_mergeAccs(&acc[0],
+                                     secret + secretSize
+                                            - (acc).sizeof - XXH_SECRET_MERGEACCS_START,
+                                     ~(cast(xxh_u64)len * XXH_PRIME64_2));
+        return h128;
+    }
+}
+
+private XXH128_hash_t
+XXH3_hashLong_128b_default(const void*  input, size_t len,
+                           XXH64_hash_t seed64,
+                           const void*  secret, size_t secretLen)
+@trusted pure nothrow @nogc
+{
+    cast(void)seed64; cast(void)secret; cast(void)secretLen;
+    return XXH3_hashLong_128b_internal(input, len, &XXH3_kSecret[0], (XXH3_kSecret).sizeof,
+                                       XXH3_accumulate_512, XXH3_scrambleAcc);
+}
+
+/*
+ * It's important for performance to pass @p secretLen (when it's static)
+ * to the compiler, so that it can properly optimize the vectorized loop.
+ */
+private XXH128_hash_t
+XXH3_hashLong_128b_withSecret(const void* input, size_t len,
+                              XXH64_hash_t seed64,
+                              const void* secret, size_t secretLen)
+@trusted pure nothrow @nogc
+{
+    cast(void)seed64;
+    return XXH3_hashLong_128b_internal(input, len, cast(const xxh_u8*)secret, secretLen,
+                                       XXH3_accumulate_512, XXH3_scrambleAcc);
+}
+private XXH128_hash_t
+XXH3_hashLong_128b_withSeed_internal(const void* input, size_t len,
+                                XXH64_hash_t seed64,
+                                XXH3_f_accumulate_512 f_acc512,
+                                XXH3_f_scrambleAcc f_scramble,
+                                XXH3_f_initCustomSecret f_initSec)
+@trusted pure nothrow @nogc
+{
+    if (seed64 == 0)
+        return XXH3_hashLong_128b_internal(input, len,
+                                           &XXH3_kSecret[0], (XXH3_kSecret).sizeof,
+                                           f_acc512, f_scramble);
+    {   align(XXH_SEC_ALIGN) xxh_u8[XXH_SECRET_DEFAULT_SIZE] secret;
+        f_initSec(&secret[0], seed64);
+        return XXH3_hashLong_128b_internal(input, len, cast(const xxh_u8*)&secret[0], (secret).sizeof,
+                                           f_acc512, f_scramble);
+    }
+}
+/*
+ * It's important for performance that XXH3_hashLong is not inlined.
+ */
+private XXH128_hash_t
+XXH3_hashLong_128b_withSeed(const void* input, size_t len,
+                            XXH64_hash_t seed64, const void* secret, size_t secretLen)
+@trusted pure nothrow @nogc
+{
+    cast(void)secret; cast(void)secretLen;
+    return XXH3_hashLong_128b_withSeed_internal(input, len, seed64,
+                XXH3_accumulate_512, XXH3_scrambleAcc, XXH3_initCustomSecret);
+}
+
+alias XXH3_hashLong128_f = XXH128_hash_t function(const void* , size_t,
+                                            XXH64_hash_t, const void* , size_t)
+                                            @trusted pure nothrow @nogc;
+
+private XXH128_hash_t
+XXH3_128bits_internal(const void* input, size_t len,
+                      XXH64_hash_t seed64, const void* secret, size_t secretLen,
+                      XXH3_hashLong128_f f_hl128)
+@trusted pure nothrow @nogc
+{
+    assert(secretLen >= XXH3_SECRET_SIZE_MIN);
+    /*
+     * If an action is to be taken if `secret` conditions are not respected,
+     * it should be done here.
+     * For now, it's a contract pre-condition.
+     * Adding a check and a branch here would cost performance at every hash.
+     */
+    if (len <= 16)
+        return XXH3_len_0to16_128b(cast(const xxh_u8*)input, len, cast(const xxh_u8*)secret, seed64);
+    if (len <= 128)
+        return XXH3_len_17to128_128b(cast(const xxh_u8*)input, len, cast(const xxh_u8*)secret, secretLen, seed64);
+    if (len <= XXH3_MIDSIZE_MAX)
+        return XXH3_len_129to240_128b(cast(const xxh_u8*)input, len, cast(const xxh_u8*)secret, secretLen, seed64);
+    return f_hl128(input, len, seed64, secret, secretLen);
+}
+
+/* ===   Public XXH128 API   === */
+
+/*! @ingroup XXH3_family */
+XXH128_hash_t XXH3_128bits(const void* input, size_t len)
+@trusted pure nothrow @nogc
+{
+    return XXH3_128bits_internal(input, len, 0,
+                                 &XXH3_kSecret[0], (XXH3_kSecret).sizeof,
+                                 &XXH3_hashLong_128b_default);
+}
+
+/*! @ingroup XXH3_family */
+XXH128_hash_t
+XXH3_128bits_withSecret(const void* input, size_t len, const void* secret, size_t secretSize)
+@trusted pure nothrow @nogc
+{
+    return XXH3_128bits_internal(input, len, 0,
+                                 cast(const xxh_u8*)secret, secretSize,
+                                 &XXH3_hashLong_128b_withSecret);
+}
+
+/*! @ingroup XXH3_family */
+XXH128_hash_t
+XXH3_128bits_withSeed(const void* input, size_t len, XXH64_hash_t seed)
+@trusted pure nothrow @nogc
+{
+    return XXH3_128bits_internal(input, len, seed,
+                                 &XXH3_kSecret[0], (XXH3_kSecret).sizeof,
+                                 &XXH3_hashLong_128b_withSeed);
+}
+
+/*! @ingroup XXH3_family */
+XXH128_hash_t
+XXH3_128bits_withSecretandSeed(const void* input, size_t len, const void* secret, size_t secretSize, XXH64_hash_t seed)
+@trusted pure nothrow @nogc
+{
+    if (len <= XXH3_MIDSIZE_MAX)
+        return XXH3_128bits_internal(input, len, seed, &XXH3_kSecret[0], (XXH3_kSecret).sizeof, null);
+    return XXH3_hashLong_128b_withSecret(input, len, seed, secret, secretSize);
+}
+
+/*! @ingroup XXH3_family */
+XXH128_hash_t
+XXH128(const void* input, size_t len, XXH64_hash_t seed)
+@trusted pure nothrow @nogc
+{
+    return XXH3_128bits_withSeed(input, len, seed);
+}
+
+XXH_errorcode
+XXH3_128bits_reset(XXH3_state_t* statePtr)
+@trusted pure nothrow @nogc
+{
+    return XXH3_64bits_reset(statePtr);
+}
+
+/*! @ingroup XXH3_family */
+XXH_errorcode
+XXH3_128bits_reset_withSecret(XXH3_state_t* statePtr, const void* secret, size_t secretSize)
+@trusted pure nothrow @nogc
+{
+    return XXH3_64bits_reset_withSecret(statePtr, secret, secretSize);
+}
+
+/*! @ingroup XXH3_family */
+XXH_errorcode
+XXH3_128bits_reset_withSeed(XXH3_state_t* statePtr, XXH64_hash_t seed)
+@trusted pure nothrow @nogc
+{
+    return XXH3_64bits_reset_withSeed(statePtr, seed);
+}
+
+/*! @ingroup XXH3_family */
+XXH_errorcode
+XXH3_128bits_reset_withSecretandSeed(XXH3_state_t* statePtr, const void* secret, size_t secretSize, XXH64_hash_t seed)
+@trusted pure nothrow @nogc
+{
+    return XXH3_64bits_reset_withSecretandSeed(statePtr, secret, secretSize, seed);
+}
+
+XXH_errorcode
+XXH3_128bits_update(XXH3_state_t* state, const void* input, size_t len)
+@trusted pure nothrow @nogc
+{
+    return XXH3_update(state, cast(const xxh_u8*)input, len,
+                       XXH3_accumulate_512, XXH3_scrambleAcc);
+}
+
+/*! @ingroup XXH3_family */
+XXH128_hash_t XXH3_128bits_digest (const XXH3_state_t* state)
+@trusted pure nothrow @nogc
+{
+    const ubyte* secret = (state.extSecret == null) ? &state.customSecret[0] : &state.extSecret[0];
+    if (state.totalLen > XXH3_MIDSIZE_MAX) {
+        align(XXH_ACC_ALIGN) XXH64_hash_t[XXH_ACC_NB] acc;
+        XXH3_digest_long(&acc[0], state, secret);
+        assert(state.secretLimit + XXH_STRIPE_LEN >= (acc).sizeof + XXH_SECRET_MERGEACCS_START);
+        {   XXH128_hash_t h128;
+            h128.low64  = XXH3_mergeAccs(&acc[0],
+                                         secret + XXH_SECRET_MERGEACCS_START,
+                                         cast(xxh_u64)state.totalLen * XXH_PRIME64_1);
+            h128.high64 = XXH3_mergeAccs(&acc[0],
+                                         secret + state.secretLimit + XXH_STRIPE_LEN
+                                                - (acc).sizeof - XXH_SECRET_MERGEACCS_START,
+                                         ~(cast(xxh_u64)state.totalLen * XXH_PRIME64_2));
+            return h128;
+        }
+    }
+    /* len <= XXH3_MIDSIZE_MAX : short code */
+    if (state.seed)
+        return XXH3_128bits_withSeed(&state.buffer[0], cast(size_t)state.totalLen, state.seed);
+    return XXH3_128bits_withSecret(&state.buffer[0], cast(size_t)(state.totalLen),
+                                   secret, state.secretLimit + XXH_STRIPE_LEN);
+}
+
 /* ----------------------------------------------------------------------------------------*/
 /* ----------------------------------------------------------------------------------------*/
 extern (C) {
@@ -2055,17 +2546,17 @@ extern (C) {
 //        @trusted pure nothrow @nogc;
 //    XXH64_hash_t  XXH3_64bits_digest (const XXH3_state_t* statePtr) @trusted pure nothrow @nogc;
 
-    XXH128_hash_t XXH3_128bits(const void* data, size_t len) @trusted pure nothrow @nogc;
-    XXH128_hash_t XXH3_128bits_withSeed(const void* data, size_t len, XXH64_hash_t seed) @trusted pure nothrow @nogc;
-    XXH128_hash_t XXH3_128bits_withSecret(const void* data, size_t len, const void* secret, size_t secretSize)
-        @trusted pure nothrow @nogc;
-    XXH_errorcode XXH3_128bits_reset(XXH3_state_t* statePtr) @trusted pure nothrow @nogc;
-    XXH_errorcode XXH3_128bits_reset_withSeed(XXH3_state_t* statePtr, XXH64_hash_t seed) @trusted pure nothrow @nogc;
-    XXH_errorcode XXH3_128bits_reset_withSecret(XXH3_state_t* statePtr, const void* secret, size_t secretSize)
-        @trusted pure nothrow @nogc;
-    XXH_errorcode XXH3_128bits_update (XXH3_state_t* statePtr, const void* input, size_t length)
-        @trusted pure nothrow @nogc;
-    XXH128_hash_t XXH3_128bits_digest (const XXH3_state_t* statePtr) @trusted pure nothrow @nogc;
+//    XXH128_hash_t XXH3_128bits(const void* data, size_t len) @trusted pure nothrow @nogc;
+//    XXH128_hash_t XXH3_128bits_withSeed(const void* data, size_t len, XXH64_hash_t seed) @trusted pure nothrow @nogc;
+//    XXH128_hash_t XXH3_128bits_withSecret(const void* data, size_t len, const void* secret, size_t secretSize)
+//        @trusted pure nothrow @nogc;
+//    XXH_errorcode XXH3_128bits_reset(XXH3_state_t* statePtr) @trusted pure nothrow @nogc;
+//    XXH_errorcode XXH3_128bits_reset_withSeed(XXH3_state_t* statePtr, XXH64_hash_t seed) @trusted pure nothrow @nogc;
+//    XXH_errorcode XXH3_128bits_reset_withSecret(XXH3_state_t* statePtr, const void* secret, size_t secretSize)
+//        @trusted pure nothrow @nogc;
+//    XXH_errorcode XXH3_128bits_update (XXH3_state_t* statePtr, const void* input, size_t length)
+//        @trusted pure nothrow @nogc;
+//    XXH128_hash_t XXH3_128bits_digest (const XXH3_state_t* statePtr) @trusted pure nothrow @nogc;
 
     int XXH128_isEqual(XXH128_hash_t h1, XXH128_hash_t h2) @trusted pure nothrow @nogc;
     int XXH128_cmp(const void* h128_1, const void* h128_2) @trusted pure nothrow @nogc;
