@@ -99,9 +99,9 @@ struct XXH128_hash_t {
     XXH64_hash_t high64;  /*!< `value >> 64` */
 }
 
-alias XXH32_canonical_t = uint32_t;
-alias XXH64_canonical_t = uint64_t;
-alias XXH128_canonical_t = XXH128_hash_t;
+alias XXH32_canonical_t = ubyte[4];
+alias XXH64_canonical_t = ubyte[8];
+alias XXH128_canonical_t = ubyte[16];
 
 struct XXH32_state_t;
 struct XXH64_state_t;
@@ -710,7 +710,7 @@ auto xxh128Of(T...)(T data)
 alias XXH32Digest = WrapperDigest!XXH_32;
 alias XXH64Digest = WrapperDigest!XXH_64; ///ditto
 alias XXH3_64Digest = WrapperDigest!XXH3_64; ///ditto
-alias XXH128Digest = WrapperDigest!XXH3_128; ///ditto
+alias XXH3_128Digest = WrapperDigest!XXH3_128; ///ditto
 
 ///
 @safe unittest
